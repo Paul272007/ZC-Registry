@@ -12,9 +12,12 @@ for filepath in glob.glob("packages/**/*.json", recursive=True):
         if name not in index["packages"]:
             index["packages"][name] = {"latest": version, "versions": {}}
 
+        pkg.pop("name", None)
+        pkg.pop("version", None)
+
         index["packages"][name]["versions"][version] = pkg
 
 with open("index.json", "w") as f:
-    json.dump(index, f, indent=2)
+    json.dump(index, f)
 
 print("index.json successfully generated")
