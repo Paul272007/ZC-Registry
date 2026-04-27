@@ -1,32 +1,48 @@
-name: Validate Package Publication
+name: Registry Security Check
 on:
+  push:
+    paths:
+      - 'packages/**/*.json'
   pull_request:
     paths:
-      - 'packages/**'
+      - 'packages/**/*.json'
 
 jobs:
-  security-check:
+  verify-identity:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Verify Identity
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Validate Source Repository Ownership
         shell: bash
         run: |
-          REPO_URL=$(jq -r '.url' ${{ github.event.pull_request.head.ref }})
+          CHANGED_FILE=$(git diff --name-only HEAD^ HEAD | grep '\.json$' | head -n 1)
           
-          USER_LOGIN="${{ github.event.pull_request.user.login }}"
+          if [ -z "$CHANGED_FILE" ]; then
+            echo "No package JSON modified."
+            exit 0
+          fi
           
-          REPO_PATH=$(echo $REPO_URL | sed 's|https://github.com/||' | sed 's|/archive.*||')
+          echo "Checking package file: $CHANGED_FILE"
           
-          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/$REPO_PATH/collaborators/$USER_LOGIN/permission")
+          OWNER=$(jq -r '.owner' "$CHANGED_FILE")
+          ARCHIVE_URL=$(jq -r '.url' "$CHANGED_FILE")
           
-          PERMISSION=$(echo $RESPONSE | jq -r '.permission')
+          echo "Declared Owner: $OWNER"
+          echo "Archive URL: $ARCHIVE_URL"
           
-          if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
-            echo "✅ Identity Verified: $USER_LOGIN has $PERMISSION rights on $REPO_PATH"
-          else
-            echo "❌ Security Alert: $USER_LOGIN is not authorized to publish for $REPO_PATH"
+          if [[ "$ARCHIVE_URL" != *"github.com/$OWNER/"* ]]; then
+            echo "::error::Security Alert: Archive URL does not belong to the declared owner ($OWNER)."
             exit 1
           fi
+          
+          ACTOR="${{ github.actor }}"
+          if [[ "$ACTOR" != "$OWNER" && "$ACTOR" != "Paul272007" ]]; then
+            echo "::error::Security Alert: User '$ACTOR' is trying to publish a package owned by '$OWNER'."
+            exit 1
+          fi
+          
+          echo "✅ Package integrity and ownership verified."
