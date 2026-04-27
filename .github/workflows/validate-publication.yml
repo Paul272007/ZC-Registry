@@ -1,0 +1,32 @@
+name: Validate Package Publication
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+
+jobs:
+  security-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify Identity
+        shell: bash
+        run: |
+          REPO_URL=$(jq -r '.url' ${{ github.event.pull_request.head.ref }})
+          
+          USER_LOGIN="${{ github.event.pull_request.user.login }}"
+          
+          REPO_PATH=$(echo $REPO_URL | sed 's|https://github.com/||' | sed 's|/archive.*||')
+          
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/$REPO_PATH/collaborators/$USER_LOGIN/permission")
+          
+          PERMISSION=$(echo $RESPONSE | jq -r '.permission')
+          
+          if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
+            echo "✅ Identity Verified: $USER_LOGIN has $PERMISSION rights on $REPO_PATH"
+          else
+            echo "❌ Security Alert: $USER_LOGIN is not authorized to publish for $REPO_PATH"
+            exit 1
+          fi
