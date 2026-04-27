@@ -2,5 +2,6 @@
   "name": "zdebug",
   "sha256": "0ca09333877a292aaf64398e8a812c77c48dc6c4bcdf677881c49f532bb636e1",
   "url": "https://github.com/Paul272007/zdebug/archive/refs/tags/v1.0.0.tar.gz",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "owner": "Paul272007"
 }
